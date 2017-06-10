@@ -18,7 +18,7 @@
 
 
 #define SHM_SIZE 4096 //shared memory size is 4KB (Page Size)
-#define FIFO_NAME "fifo_clientToServer"
+#define FIFO_NAME "fifo_clientTOServer"
 
 void GetPidFromFifo(int fifoFd, pid_t *pid)
 {

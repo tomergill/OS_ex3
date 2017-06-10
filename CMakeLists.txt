@@ -4,4 +4,5 @@ project(OS_ex3)
 set(CMAKE_C_STANDARD 99)
 
 set(SOURCE_FILES ex31.c)
-add_executable(OS_ex3 ${SOURCE_FILES})
+add_executable(ex31.out ${SOURCE_FILES})
+add_executable(ex32.out ex32.c)
