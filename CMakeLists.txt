@@ -3,5 +3,5 @@ project(OS_ex3)
 
 set(CMAKE_C_STANDARD 99)
 
-set(SOURCE_FILES main.c)
+set(SOURCE_FILES ex31.c)
 add_executable(OS_ex3 ${SOURCE_FILES})
