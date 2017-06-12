@@ -2,7 +2,7 @@
  * Student name: Tomer Gill
  * Student: 318459450
  * Course Exercise Group: 01 (CS student, actual group is 89231-03)
- * Exercise name: Exercise 2
+ * Exercise name: Exercise 3
 *******************************************************************************/
 
 #include <fcntl.h>
@@ -27,8 +27,6 @@
 #define OTHER_COLOR(color) (((color) % 2) + 1)
 
 typedef enum {EMPTY = 0, WHITE = 1, BLACK = 2} TILE;
-
-
 
 char gotSIGUSR1 = 0;
 
@@ -110,6 +108,40 @@ char GetCharFromTileEnum(TILE t)
     }
 }
 
+void CheckGameEnd(TILE board[ROWS][COLS], void *data)
+{
+    int i, j, bcounter = 0, wcounter = 0;
+
+    for (i = 0; i < ROWS; ++i)
+    {
+        for (j = 0; j < COLS; ++j) {
+            switch (board[i][j])
+            {
+                case BLACK:
+                    bcounter++;
+                    break;
+                case WHITE:
+                    wcounter++;
+                    break;
+                default: //EMPTY
+                    return; //game didn't end
+            }
+        }
+    }
+
+    /* If got to this place, the board is full and the game is over */
+    if (bcounter > wcounter)
+        printf("Winning player: Black\n");
+    else if (wcounter > bcounter)
+        printf("Winning player: White\n");
+    else
+        printf("No winning player\n");
+
+    if (shmdt(data) == -1)
+        perror("shared memory detach error");
+    exit(EXIT_SUCCESS);
+}
+
 void waitForOtherPlayer(char *data, TILE board[ROWS][COLS], TILE color)
 {
     do {
@@ -123,6 +155,7 @@ void waitForOtherPlayer(char *data, TILE board[ROWS][COLS], TILE color)
 
     MakeAMove(board, OTHER_COLOR(color), y, x);
     PrintBoard(board);
+    CheckGameEnd(board, data);
 }
 
 int main()
@@ -134,8 +167,6 @@ int main()
     TILE board[ROWS][COLS], copyBoard[ROWS][COLS];
     int i, j, x, y;
     TILE myColor;
-    char gameEnded = 0;
-    int piecesFlipped;
 
     /* Opening the fifo */
     if ((fifo = open(FIFO_NAME, O_RDWR | O_TRUNC)) == -1)
@@ -198,10 +229,13 @@ int main()
     /* defining the player's color */
     if (*data == 'b') //aka second player
         myColor = WHITE;
-    else
+    else {
         myColor = BLACK;
+        *data = 'b';
+        PrintBoard(board);
+    }
 
-    while (!gameEnded)
+    while (1)
     {
         if (myColor == WHITE)
             waitForOtherPlayer(data, board, myColor);
@@ -230,7 +264,7 @@ int main()
             }
             memcpy(copyBoard, board, sizeof(TILE) * ROWS * COLS);
             if (board[y][x] != EMPTY ||
-                    (piecesFlipped = MakeAMove(copyBoard, myColor, y, x)) == 0)
+                    MakeAMove(copyBoard, myColor, y, x) == 0)
             {
                 printf("This square is invalid\n"
                                "Please choose another square\n");
@@ -241,10 +275,12 @@ int main()
         } while (x != -1 && y != -1);
 
         PrintBoard(board);
-        data[0] = GetCharFromTileEnum(myColor);
-        data[1] = (char) GET_CHAR_FROM_DIGIT(x);
-        data[2] = (char) GET_CHAR_FROM_DIGIT(y);
-        data[3] = '\0';
+        data[3] = '\0'; //null-terminator
+        data[2] = (char) GET_CHAR_FROM_DIGIT(y); //row number
+        data[1] = (char) GET_CHAR_FROM_DIGIT(x); //column number
+        data[0] = GetCharFromTileEnum(myColor); //color = b / w
+
+        CheckGameEnd(board, data);
 
         if (myColor == BLACK)
             waitForOtherPlayer(data, board, myColor);

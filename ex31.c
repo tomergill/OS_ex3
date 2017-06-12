@@ -2,7 +2,7 @@
  * Student name: Tomer Gill
  * Student: 318459450
  * Course Exercise Group: 01 (CS student, actual group is 89231-03)
- * Exercise name: Exercise 2
+ * Exercise name: Exercise 3
 *******************************************************************************/
 
 #include <stdio.h>
@@ -18,8 +18,16 @@
 
 
 #define SHM_SIZE 4096 //shared memory size is 4KB (Page Size)
-#define FIFO_NAME "fifo_clientTOServer"
+#define FIFO_NAME "fifo_clientTOServer" //name of the fifo "file"
 
+/******************************************************************************
+ * function name: GetPidFromFifo
+ * The Input: The fifo file descriptor, and a pointer to a pid_t struct to be
+ * filled with a pid.
+ * The output: Either a pid_t from the fifo, or NULL if there were a problem
+ * with the read from the fifo.
+ * The Function operation: Reads from the fifo the struct.
+*******************************************************************************/
 void GetPidFromFifo(int fifoFd, pid_t *pid)
 {
     int bytesRead;
@@ -39,12 +47,21 @@ void GetPidFromFifo(int fifoFd, pid_t *pid)
     //read into pid_t
 }
 
+/******************************************************************************
+ * function name: main
+ * The Input: None.
+ * The output: Reversi game.
+ * The Function operation: Creates a fifo, then reads from it 2 pids of
+ * client processes that will play the game. Then it closes the fifo, creates
+ * a shared memory for the clients to play and then signals them a SIGUSR1
+ * that notifies them that they can start playing.
+*******************************************************************************/
 int main() {
     key_t key;
     int fifo;
     pid_t pid1, pid2;
-    int shmid;
     char *data;
+    int shmid;
 
     //creating a key
     if ((key = ftok("ex31.c", 'k')) == -1) {
@@ -88,10 +105,10 @@ int main() {
         perror("error deleting fifo");
 
     kill(pid1, SIGUSR1);
-    while (*data != 'a') {sleep(1);} //TODO change this to what move is
+    while (*data != 'b') {sleep(1);} //TODO change this to what move is
     kill(pid2, SIGUSR1);
 
-    while (*data != 'b') {sleep(1);} //TODO change this to win condition
+    while (*data != 'w') {sleep(1);} //TODO change this to win condition
 
     printf("GAME OVER\n");
     //TODO print appropriate error message.
