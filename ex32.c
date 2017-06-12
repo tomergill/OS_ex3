@@ -29,15 +29,46 @@ void SIGUSR1Handler(int flag)
         gotSIGUSR1 = 1;
 }
 
+void PrintBoard(TILE board[ROWS][COLS])
+{
+    int i, j;
+
+    printf("The board is:\n");
+    for (i = 0; i < ROWS; ++i)
+    {
+        for (j = 0; j < COLS; ++j) {
+            printf("%d", board[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+int MakeAMove(TILE board[ROWS][COLS], TILE color, int row, int col)
+{
+    if (row < 0 || row >= ROWS || col < 0 || col >= COLS)
+        return -1; //error
+
+    int i, j;
+
+
+}
+
+void waitForOtherPlayer(char *data, TILE board[ROWS][COLS], TILE color)
+{
+    printf("Waiting for the other player to make a move\n");
+
+}
+
 int main()
 {
     int fifo, shmid;
     char buffer[16];
     key_t key;
     char *data;
-    char player;
     TILE board[ROWS][COLS];
     int i, j;
+    TILE myColor;
+    char gameEnded = 0;
 
     /* Opening the fifo */
     if ((fifo = open(FIFO_NAME, O_RDWR | O_TRUNC)) == -1)
@@ -84,7 +115,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    /* grab the shared memory created by ex31.c: */
+    /* grab the shared memory created by server: */
     if ((shmid = shmget(key, SHM_SIZE, 0)) == -1) {
         perror("shmget error");
         exit(EXIT_FAILURE);
@@ -97,9 +128,20 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    /* first move */
-    if (*data != 'b')
-    {
+    /* defining the player's color */
+    if (*data == 'b') //aka second player
+        myColor = WHITE;
+    else
+        myColor = BLACK;
 
+    while (!gameEnded)
+    {
+        if (myColor == WHITE)
+            waitForOtherPlayer(data, board, myColor);
+
+        // TODO making a move
+
+        if (myColor == BLACK)
+            waitForOtherPlayer(data, board, myColor);
     }
 }
