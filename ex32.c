@@ -395,12 +395,12 @@ int main()
 
         PrintBoard(board);
 
-        CheckGameEnd(board, data, myColor, 1);
-
         data[3] = '\0'; //null-terminator
         data[2] = (char) GET_CHAR_FROM_DIGIT(y); //row number
         data[1] = (char) GET_CHAR_FROM_DIGIT(x); //column number
         data[0] = GetCharFromTileEnum(myColor); //color = b / w
+
+        CheckGameEnd(board, data, myColor, 1);
 
         if (myColor == BLACK)
             WaitForOtherPlayer(data, board, myColor);
