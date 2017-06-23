@@ -20,8 +20,8 @@
 #define ROWS 8
 #define COLS 8
 
-#define IS_IN_BOARD_X(col) ((col) >= 0 || (col) < COLS)
-#define IS_IN_BOARD_Y(row) ((row) >= 0 || (row) < ROWS)
+#define IS_IN_BOARD_X(col) ((col) >= 0 && (col) < COLS)
+#define IS_IN_BOARD_Y(row) ((row) >= 0 && (row) < ROWS)
 #define GET_DIGIT_FROM_CHAR(c) ((c) - '0')
 #define GET_CHAR_FROM_DIGIT(c) ((c) + '0')
 #define OTHER_COLOR(color) (((color) % 2) + 1)
@@ -41,7 +41,7 @@ void PrintBoard(TILE board[ROWS][COLS])
     int i, j;
 
     printf("The board is:\n");
-    for (i = ROWS - 1; i >= 0; --i)
+    for (i = 0; i < ROWS; ++i)
     {
         for (j = 0; j < COLS; ++j) {
             printf("%d", board[i][j]);
@@ -55,7 +55,7 @@ int AddPieceAndFlip(int startX, int startY, int dx, int dy,
 {
     int x, y, counter = 0;
     for (x = startX + dx, y = startY + dy; IS_IN_BOARD_X(x) && IS_IN_BOARD_Y(y);
-         ++x, ++y)
+         x += dx, y+=dy)
     {
         if (board[y][x] == OTHER_COLOR(color))
             continue;
@@ -64,7 +64,7 @@ int AddPieceAndFlip(int startX, int startY, int dx, int dy,
 
         /* board[y][x] == color */
         for (x -= dx, y -= dy;
-             x != startX && y != startY;
+             x != startX || y != startY;
              x -= dx, y -= dy, ++counter)
             board[y][x] = color;
         break;
@@ -209,12 +209,13 @@ void CheckForPossibleMoves(TILE board[ROWS][COLS], char *data, TILE color)
     for (i = 0; i < ROWS; ++i)
     {
         for (j = 0; j < COLS; ++j) {
-            if (board[i][j] != EMPTY)
+            if (board[i][j] != EMPTY) {
+                if (board[i][j] == BLACK)
+                    bcounter++;
+                else //WHITE
+                    wcounter++;
                 continue;
-            else if (board[i][j] == BLACK)
-                bcounter++;
-            else //WHITE
-                wcounter++;
+            }
             memcpy(copyBoard, board, sizeof(TILE) * ROWS * COLS);
             if (MakeAMove(copyBoard, color, i, j)) //means there is a valid move
                 return;
@@ -262,6 +263,8 @@ int main()
     int i, j, x, y;
     TILE myColor;
 
+    printf("%d\n", getpid());
+
     /* Opening the fifo */
     if ((fifo = open(FIFO_NAME, O_RDWR)) == -1)
     {
@@ -270,8 +273,9 @@ int main()
     }
 
     /* writing own pid to fifo */
-    buffer[sprintf(buffer, "%d", getpid())] = '\0';
-    if (write(fifo, buffer, strlen(buffer)) == -1)
+    //buffer[sprintf(buffer, "%d", getpid())] = '\0';
+    pid_t mypid = getpid();
+    if (write(fifo, &mypid, sizeof(pid_t)) == -1)
     {
         perror("write pid error");
         if (close(fifo) == -1)
@@ -326,7 +330,7 @@ int main()
         myColor = WHITE;
     else { //first player
         myColor = BLACK;
-        *data = 'b';
+        //*data = 'b';
         PrintBoard(board);
     }
 

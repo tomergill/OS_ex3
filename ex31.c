@@ -33,16 +33,17 @@ void GetPidFromFifo(int fifoFd, pid_t *pid)
 
     if ((bytesRead = read(fifoFd, pid, sizeof(pid_t))) == -1)
     {
-        perror("error reading pid");
+        perror("error reading pid 1");
         unlink(FIFO_NAME);
         exit(EXIT_FAILURE);
     }
-    else if (bytesRead != sizeof(pid_t))
-    {
-        perror("error reading pid");
-        unlink(FIFO_NAME);
-        exit(EXIT_FAILURE);
-    }
+//    else if (bytesRead != sizeof(pid_t))
+//    {
+//        perror("error reading pid 2");
+//        unlink(FIFO_NAME);
+//        exit(EXIT_FAILURE);
+//    }
+    printf("got pid: %d\n", *pid);
     //read into pid_t
 }
 
@@ -68,18 +69,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    /* create the segment: */
-    if ((shmid = shmget(key, SHM_SIZE, 0644 | IPC_CREAT)) == -1) {
-        perror("server shmget error");
-        exit(EXIT_FAILURE);
-    }
-
-    /* attach to the segment to get a pointer to it: */
-    data = shmat(shmid, NULL, 0);
-    if (data == (char *)(-1)) {
-        perror("server shmat error");
-        exit(EXIT_FAILURE);
-    }
+    printf("got key\n");
 
     //creating fifo
     if (mkfifo(FIFO_NAME, 0666) == -1)
@@ -95,6 +85,8 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    printf("opened fifo\n");
+
     GetPidFromFifo(fifo, &pid1);
     GetPidFromFifo(fifo, &pid2);
 
@@ -102,6 +94,19 @@ int main() {
         perror("error closing fifo fd");
     if (unlink(FIFO_NAME) == -1)
         perror("error deleting fifo");
+
+    /* create the segment: */
+    if ((shmid = shmget(key, SHM_SIZE, 0644 | IPC_CREAT)) == -1) {
+        perror("server shmget error");
+        exit(EXIT_FAILURE);
+    }
+
+    /* attach to the segment to get a pointer to it: */
+    data = shmat(shmid, NULL, 0);
+    if (data == (char *)(-1)) {
+        perror("server shmat error");
+        exit(EXIT_FAILURE);
+    }
 
     data[0] = data[1] = data[2] = data[3] = '\0'; //initializing shared memory
 
