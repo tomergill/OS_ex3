@@ -346,7 +346,9 @@ int main()
 
         do
         {
-//            buffer[scanf("%15s", buffer)] = '\0';
+//            strcpy(buffer, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
+//            buffer[scanf("%s", buffer)] = '\0';
+
 //            sscanf()
 //            if (buffer[0] != '[' || buffer[4] != '[' || buffer[2] != ',' ||
 //                    !isdigit(buffer[1]) || !isdigit(buffer[3]))
@@ -357,8 +359,8 @@ int main()
 //            }
 //            x = GET_DIGIT_FROM_CHAR(buffer[1]);
 //            y = GET_DIGIT_FROM_CHAR(buffer[3]);
-
-            scanf("[%d,%d]", &x, &y);
+            scanf("%15s", buffer);
+            sscanf(buffer, "[%d,%d]", &x, &y);
 
             if (x == -1 || y == -1)
             {
