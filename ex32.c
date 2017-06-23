@@ -15,7 +15,7 @@
 #include <sys/shm.h>
 #include <ctype.h>
 
-#define FIFO_NAME "fifo_clientTOServer"
+#define FIFO_NAME "fifo_clientTOserver"
 #define SHM_SIZE 4096 //shared memory size is 4KB (Page Size)
 #define ROWS 8
 #define COLS 8
@@ -80,6 +80,8 @@ int MakeAMove(TILE board[ROWS][COLS], TILE color, int row, int col)
 
     int sum = 0;
 
+    board[row][col] = color; //putting piece
+
     /* flip to every direction and sum the number of flipped pieces */
     sum += AddPieceAndFlip(col, row, -1, -1, board, color); //left-up
     sum += AddPieceAndFlip(col, row, -1, 0, board, color); //left
@@ -108,9 +110,10 @@ char GetCharFromTileEnum(TILE t)
     }
 }
 
-void CheckGameEnd(TILE board[ROWS][COLS], void *data)
+void CheckGameEnd(TILE board[ROWS][COLS], char *data, TILE color, char myTurn)
 {
     int i, j, bcounter = 0, wcounter = 0;
+    TILE c;
 
     for (i = 0; i < ROWS; ++i)
     {
@@ -130,24 +133,64 @@ void CheckGameEnd(TILE board[ROWS][COLS], void *data)
     }
 
     /* If got to this place, the board is full and the game is over */
-    if (bcounter > wcounter)
+    if (bcounter > wcounter) {
         printf("Winning player: Black\n");
-    else if (wcounter > bcounter)
+        c = BLACK;
+    }
+    else if (wcounter > bcounter) {
         printf("Winning player: White\n");
-    else
+        c = WHITE;
+    }
+    else {
         printf("No winning player\n");
+        c = EMPTY;
+    }
 
-    if (shmdt(data) == -1)
+    /*
+     * writing to shared memory that the game ended if I wasn't the one who
+     * played last turn.
+     */
+    if (!myTurn) {
+        data[2] = '\0';
+        data[1] = GetCharFromTileEnum(c);
+        data[0] = '*';
+    }
+
+    if (shmdt(data) == -1) {
         perror("shared memory detach error");
+        exit(EXIT_FAILURE);
+    }
+
     exit(EXIT_SUCCESS);
 }
 
-void waitForOtherPlayer(char *data, TILE board[ROWS][COLS], TILE color)
+void WaitForOtherPlayer(char *data, TILE board[ROWS][COLS], TILE color)
 {
     do {
         printf("Waiting for the other player to make a move\n");
         if (*data == GetCharFromTileEnum(OTHER_COLOR(color)))
             break;
+        else if (*data == '*') //game is done
+        {
+            switch(data[1]) { //check which player won
+                default:
+                    printf("No winning player\n");
+                    break;
+                case 'b':
+                    printf("Winning player: Black");
+                    break;
+                case 'w':
+                    printf("Winning player: White");
+                    break;
+            }
+
+            if (shmdt(data) == -1) {
+                perror("shared memory detach error");
+                exit(EXIT_FAILURE);
+            }
+
+            exit(EXIT_SUCCESS);
+        }
     } while (!sleep(1));
 
     int x = GET_DIGIT_FROM_CHAR(data[1]),
@@ -155,7 +198,58 @@ void waitForOtherPlayer(char *data, TILE board[ROWS][COLS], TILE color)
 
     MakeAMove(board, OTHER_COLOR(color), y, x);
     PrintBoard(board);
-    CheckGameEnd(board, data);
+    CheckGameEnd(board, data, color, 0);
+}
+
+void CheckForPossibleMoves(TILE board[ROWS][COLS], char *data, TILE color)
+{
+    int i, j, bcounter = 0, wcounter = 0;
+    TILE copyBoard[ROWS][COLS], c;
+
+    for (i = 0; i < ROWS; ++i)
+    {
+        for (j = 0; j < COLS; ++j) {
+            if (board[i][j] != EMPTY)
+                continue;
+            else if (board[i][j] == BLACK)
+                bcounter++;
+            else //WHITE
+                wcounter++;
+            memcpy(copyBoard, board, sizeof(TILE) * ROWS * COLS);
+            if (MakeAMove(copyBoard, color, i, j)) //means there is a valid move
+                return;
+        }
+    }
+
+    /* There isn't a move to be made - check who won and end the game */
+
+    /* If got to this place, the board is full and the game is over */
+    if (bcounter > wcounter) {
+        printf("Winning player: Black\n");
+        c = BLACK;
+    }
+    else if (wcounter > bcounter) {
+        printf("Winning player: White\n");
+        c = WHITE;
+    }
+    else {
+        printf("No winning player\n");
+        c = EMPTY;
+    }
+
+    /*
+     * writing to shared memory that the game ended.
+     */
+        data[2] = '\0';
+        data[1] = GetCharFromTileEnum(c);
+        data[0] = '*';
+
+    if (shmdt(data) == -1) {
+        perror("shared memory detach error");
+        exit(EXIT_FAILURE);
+    }
+
+    exit(EXIT_SUCCESS);
 }
 
 int main()
@@ -169,7 +263,7 @@ int main()
     TILE myColor;
 
     /* Opening the fifo */
-    if ((fifo = open(FIFO_NAME, O_RDWR | O_TRUNC)) == -1)
+    if ((fifo = open(FIFO_NAME, O_RDWR)) == -1)
     {
         perror("open fifo error");
         exit(EXIT_FAILURE);
@@ -181,12 +275,11 @@ int main()
     {
         perror("write pid error");
         if (close(fifo) == -1)
-            perror("write error : close error");
+            perror("write error : close fifo error");
         exit(EXIT_FAILURE);
     }
     if (close(fifo) == -1)
-        if (close(fifo) == -1)
-            perror("write error : close error");
+        perror("after write : close error");
 
     /* SIGUSR1Handler will handle a SIGUSR1 signal */
     if (signal(SIGUSR1, SIGUSR1Handler) == SIG_ERR)
@@ -197,6 +290,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
+    /* initializing the board */
     for (i = 0; i < ROWS; ++i)
         for (j = 0; j < COLS; ++j)
             board[i][j] = EMPTY;
@@ -208,6 +302,7 @@ int main()
         pause();
     while (!gotSIGUSR1);
 
+    /* get key to shared memory */
     if ((key = ftok("ex31.c", 'k')) == -1) {
         perror("ftok error");
         exit(EXIT_FAILURE);
@@ -229,7 +324,7 @@ int main()
     /* defining the player's color */
     if (*data == 'b') //aka second player
         myColor = WHITE;
-    else {
+    else { //first player
         myColor = BLACK;
         *data = 'b';
         PrintBoard(board);
@@ -238,30 +333,45 @@ int main()
     while (1)
     {
         if (myColor == WHITE)
-            waitForOtherPlayer(data, board, myColor);
+            WaitForOtherPlayer(data, board, myColor);
+
+        CheckForPossibleMoves(board, data, myColor);
 
         printf("Please choose a square\n");
         x = y = -1;
 
         do
         {
-            scanf("%5s", buffer);
-            buffer[5] = '\0';
-            if (buffer[0] != '[' || buffer[4] != '[' || buffer[2] != ',' ||
-                    !isdigit(buffer[1]) || !isdigit(buffer[3]))
+//            buffer[scanf("%15s", buffer)] = '\0';
+//            sscanf()
+//            if (buffer[0] != '[' || buffer[4] != '[' || buffer[2] != ',' ||
+//                    !isdigit(buffer[1]) || !isdigit(buffer[3]))
+//            {
+//                printf("This square is invalid\n"
+//                               "Please choose another square\n");
+//                continue;
+//            }
+//            x = GET_DIGIT_FROM_CHAR(buffer[1]);
+//            y = GET_DIGIT_FROM_CHAR(buffer[3]);
+
+            scanf("[%d,%d]", &x, &y);
+
+            if (x == -1 || y == -1)
             {
                 printf("This square is invalid\n"
                                "Please choose another square\n");
+                x = y = -1;
                 continue;
             }
-            x = GET_DIGIT_FROM_CHAR(buffer[1]);
-            y = GET_DIGIT_FROM_CHAR(buffer[3]);
+
             if (x < 0 || x >= COLS || y < 0 || y >= ROWS)
             {
                 printf("No such square\nPlease choose another square\n");
                 x = y = -1;
                 continue;
             }
+
+            /* try to make a move */
             memcpy(copyBoard, board, sizeof(TILE) * ROWS * COLS);
             if (board[y][x] != EMPTY ||
                     MakeAMove(copyBoard, myColor, y, x) == 0)
@@ -271,18 +381,22 @@ int main()
                 x = y = -1;
                 continue;
             }
+
+            /* if move was legal make the temp board the main board */
             memcpy(board, copyBoard, sizeof(TILE) * ROWS * COLS);
-        } while (x != -1 && y != -1);
+
+        } while (x == -1 || y == -1);
 
         PrintBoard(board);
+
+        CheckGameEnd(board, data, myColor, 1);
+
         data[3] = '\0'; //null-terminator
         data[2] = (char) GET_CHAR_FROM_DIGIT(y); //row number
         data[1] = (char) GET_CHAR_FROM_DIGIT(x); //column number
         data[0] = GetCharFromTileEnum(myColor); //color = b / w
 
-        CheckGameEnd(board, data);
-
         if (myColor == BLACK)
-            waitForOtherPlayer(data, board, myColor);
+            WaitForOtherPlayer(data, board, myColor);
     }
 }

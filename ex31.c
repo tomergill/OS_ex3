@@ -16,9 +16,8 @@
 #include <unistd.h>
 #include <signal.h>
 
-
-#define SHM_SIZE 4096 //shared memory size is 4KB (Page Size)
-#define FIFO_NAME "fifo_clientTOServer" //name of the fifo "file"
+#define SHM_SIZE  4096 //shared memory size is 4KB (Page Size)
+#define FIFO_NAME "fifo_clientTOserver" //name of the fifo "file"
 
 /******************************************************************************
  * function name: GetPidFromFifo
@@ -69,7 +68,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    /* connect to (and possibly create) the segment: */
+    /* create the segment: */
     if ((shmid = shmget(key, SHM_SIZE, 0644 | IPC_CREAT)) == -1) {
         perror("server shmget error");
         exit(EXIT_FAILURE);
@@ -104,14 +103,35 @@ int main() {
     if (unlink(FIFO_NAME) == -1)
         perror("error deleting fifo");
 
-    kill(pid1, SIGUSR1);
-    while (*data != 'b') {sleep(1);} //TODO change this to what move is
-    kill(pid2, SIGUSR1);
+    data[0] = data[1] = data[2] = data[3] = '\0'; //initializing shared memory
 
-    while (*data != 'w') {sleep(1);} //TODO change this to win condition
+    kill(pid1, SIGUSR1); //signal 1st process
+    while (*data != 'b') {sleep(1);} //wait for 1st process to make a move
+    kill(pid2, SIGUSR1); //signal 2nd process
+
+    while (*data != '*') {sleep(1);} //wait for end of the game
 
     printf("GAME OVER\n");
-    //TODO print appropriate error message.
+
+    switch(data[1]) { //check which player won
+        default:
+            printf("No winning player\n");
+            break;
+        case 'b':
+            printf("Winning player: Black");
+            break;
+        case 'w':
+            printf("Winning player: White");
+            break;
+    }
+
+    if (shmdt(data) == -1)
+        perror("server error when detaching form shared memory");
+
+    if (shmctl(shmid, IPC_RMID, NULL) == -1) {
+        perror("error shmctl failed");
+        exit(EXIT_FAILURE);
+    }
 
     return EXIT_SUCCESS;
 }
