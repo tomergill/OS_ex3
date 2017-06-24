@@ -254,10 +254,10 @@ void WaitForOtherPlayer(char *data, TILE board[ROWS][COLS], TILE color)
                     printf("No winning player\n");
                     break;
                 case 'b':
-                    printf("Winning player: Black");
+                    printf("Winning player: Black\n");
                     break;
                 case 'w':
-                    printf("Winning player: White");
+                    printf("Winning player: White\n");
                     break;
             }
 
@@ -359,8 +359,6 @@ int main()
     int i, j, x, y;
     TILE myColor;
 
-    printf("%d\n", getpid());
-
     /* Opening the fifo */
     if ((fifo = open(FIFO_NAME, O_RDWR)) == -1)
     {
@@ -369,7 +367,6 @@ int main()
     }
 
     /* writing own pid to fifo */
-    //buffer[sprintf(buffer, "%d", getpid())] = '\0';
     pid_t mypid = getpid();
     if (write(fifo, &mypid, sizeof(pid_t)) == -1)
     {
@@ -443,19 +440,6 @@ int main()
 
         do
         {
-//            strcpy(buffer, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
-//            buffer[scanf("%s", buffer)] = '\0';
-
-//            sscanf()
-//            if (buffer[0] != '[' || buffer[4] != '[' || buffer[2] != ',' ||
-//                    !isdigit(buffer[1]) || !isdigit(buffer[3]))
-//            {
-//                printf("This square is invalid\n"
-//                               "Please choose another square\n");
-//                continue;
-//            }
-//            x = GET_DIGIT_FROM_CHAR(buffer[1]);
-//            y = GET_DIGIT_FROM_CHAR(buffer[3]);
             scanf("%15s", buffer);
             sscanf(buffer, "[%d,%d]", &x, &y);
 

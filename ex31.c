@@ -43,7 +43,6 @@ void GetPidFromFifo(int fifoFd, pid_t *pid)
 //        unlink(FIFO_NAME);
 //        exit(EXIT_FAILURE);
 //    }
-    printf("got pid: %d\n", *pid);
     //read into pid_t
 }
 
@@ -69,8 +68,6 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("got key\n");
-
     //creating fifo
     if (mkfifo(FIFO_NAME, 0666) == -1)
     {
@@ -84,8 +81,6 @@ int main() {
         unlink(FIFO_NAME);
         exit(EXIT_FAILURE);
     }
-
-    printf("opened fifo\n");
 
     GetPidFromFifo(fifo, &pid1);
     GetPidFromFifo(fifo, &pid2);
@@ -123,10 +118,10 @@ int main() {
             printf("No winning player\n");
             break;
         case 'b':
-            printf("Winning player: Black");
+            printf("Winning player: Black\n");
             break;
         case 'w':
-            printf("Winning player: White");
+            printf("Winning player: White\n");
             break;
     }
 
