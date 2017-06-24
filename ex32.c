@@ -443,14 +443,14 @@ int main()
             scanf("%15s", buffer);
             sscanf(buffer, "[%d,%d]", &x, &y);
 
-            if (x == -1 || y == -1)
+            if (x == -1 || y == -1 || strchr(buffer, '[') == NULL ||
+                    strchr(buffer, ']') == NULL || strchr(buffer, ',') == NULL)
             {
                 printf("This square is invalid\n"
                                "Please choose another square\n");
                 x = y = -1;
                 continue;
             }
-
             if (x < 0 || x >= COLS || y < 0 || y >= ROWS)
             {
                 printf("No such square\nPlease choose another square\n");
