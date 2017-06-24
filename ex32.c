@@ -13,7 +13,6 @@
 #include <signal.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
-#include <ctype.h>
 
 #define FIFO_NAME "fifo_clientTOserver"
 #define SHM_SIZE 4096 //shared memory size is 4KB (Page Size)
@@ -22,20 +21,33 @@
 
 #define IS_IN_BOARD_X(col) ((col) >= 0 && (col) < COLS)
 #define IS_IN_BOARD_Y(row) ((row) >= 0 && (row) < ROWS)
-#define GET_DIGIT_FROM_CHAR(c) ((c) - '0')
-#define GET_CHAR_FROM_DIGIT(c) ((c) + '0')
-#define OTHER_COLOR(color) (((color) % 2) + 1)
+#define GET_DIGIT_FROM_CHAR(c) ((c) - '0') //1 turns to '1'
+#define GET_CHAR_FROM_DIGIT(c) ((c) + '0') //'4' turns to 4
+#define OTHER_COLOR(color) (((color) % 2) + 1) //BLACK <=> WHITE
 
+/* represents a color of a tile / player */
 typedef enum {EMPTY = 0, WHITE = 1, BLACK = 2} TILE;
 
-char gotSIGUSR1 = 0;
+char gotSIGUSR1 = 0; //flag represents whether the process got SIGUSR1 already
 
+/******************************************************************************
+ * function name: SIGUSR1Handler
+ * The Input: The signal that activated this function.
+ * The output: Turns the flag that indicates SIGUSR1 was handled.
+ * The Function operation: Quite literallly.
+*******************************************************************************/
 void SIGUSR1Handler(int flag)
 {
     if (flag == SIGUSR1)
         gotSIGUSR1 = 1;
 }
 
+/******************************************************************************
+ * function name: PrintBoard
+ * The Input: The board to print.
+ * The output: Prints the board.
+ * The Function operation: Goes over the board and prints it.
+*******************************************************************************/
 void PrintBoard(TILE board[ROWS][COLS])
 {
     int i, j;
@@ -50,11 +62,32 @@ void PrintBoard(TILE board[ROWS][COLS])
     }
 }
 
+/******************************************************************************
+ * function name: AddPieceAndFlip
+ * The Input: The position of the piece that was just put, the direction (as
+ *      change in x and y), the board (after piece was put!) and the color of
+ *      the player's pieces.
+ * The output: The number of pieces flipped as a result of putting the new
+ *      piece.
+ * The Function operation: Goes from the new piece to the direction
+ *      specified. As long as it still within the board's borders and the color
+ *      of the pieces are the other's color, it continues in that direction.
+ *      If there isn't a piece in our color and it's the edge of the board - no
+ *      pieces was flipped so 0 is returned.
+ *      If found an empty tile with no piece on it that means the move isn't
+ *      legal and so it returns that 0 pieces were flipped.
+ *      If found a piece with matching color, it goes back and flip every piece
+ *      in the other color to our color, and then returns how many were
+ *      flipped (0 means that a piece was put next to another piece of the
+ *      same color, meaning no pieces were flipped and that this is an
+ *      illegal move).
+*******************************************************************************/
 int AddPieceAndFlip(int startX, int startY, int dx, int dy,
                     TILE board[ROWS][COLS], TILE color)
 {
     int x, y, counter = 0;
-    for (x = startX + dx, y = startY + dy; IS_IN_BOARD_X(x) && IS_IN_BOARD_Y(y);
+    for (x = startX + dx, y = startY + dy;
+         IS_IN_BOARD_X(x) && IS_IN_BOARD_Y(y);
          x += dx, y+=dy)
     {
         if (board[y][x] == OTHER_COLOR(color))
@@ -73,6 +106,18 @@ int AddPieceAndFlip(int startX, int startY, int dx, int dy,
     return counter;
 }
 
+/******************************************************************************
+ * function name: MakeAMove
+ * The Input: The board, the color of the player making the move and the
+ *      position the new piece will be put.
+ * The output: The number of pieces flipped as a result of putting the new
+ *      piece.
+ * The Function operation: Checks if move is within borders, put the new
+ *      piece in the board and then activates the AddPieceAndFlip function in
+ *      every direction possible, summing the number of pieces flipped as a
+ *      result of the operation.
+ *      return value of 0 indiciates the move was illegal.
+*******************************************************************************/
 int MakeAMove(TILE board[ROWS][COLS], TILE color, int row, int col)
 {
     if (row < 0 || row >= ROWS || col < 0 || col >= COLS)
@@ -97,6 +142,13 @@ int MakeAMove(TILE board[ROWS][COLS], TILE color, int row, int col)
     return sum;
 }
 
+/******************************************************************************
+ * function name: GetCharFromTileEnum
+ * The Input: A TILE enum.
+ * The output: The char representing the enum.
+ * The Function operation: returns the small version of the first letter of
+ *      the TILE enum.
+*******************************************************************************/
 char GetCharFromTileEnum(TILE t)
 {
     switch (t)
@@ -110,7 +162,19 @@ char GetCharFromTileEnum(TILE t)
     }
 }
 
-void CheckGameEnd(TILE board[ROWS][COLS], char *data, TILE color, char myTurn)
+/******************************************************************************
+ * function name: CheckGameEnd
+ * The Input: The board, pointer to the shared memory and a flag indicating
+ *      whether this is my turn or not.
+ * The output: If the game has ended (due to a full board) the program exits.
+ * The Function operation: Goes over all the board, counting how many tiles
+ *      of each color there are. If an empty tile is found the func returns.
+ *      If board is full, prints the right message and exits the program
+ *      after detaching from the shared memory.
+ *      If this check wasn't on the player's turn it also write that the game
+ *      was finished and the winner to the shared memory for the server.
+*******************************************************************************/
+void CheckGameEnd(TILE board[ROWS][COLS], char *data, char myTurn)
 {
     int i, j, bcounter = 0, wcounter = 0;
     TILE c;
@@ -156,6 +220,7 @@ void CheckGameEnd(TILE board[ROWS][COLS], char *data, TILE color, char myTurn)
         data[0] = '*';
     }
 
+    //detaching from shared memory
     if (shmdt(data) == -1) {
         perror("shared memory detach error");
         exit(EXIT_FAILURE);
@@ -164,6 +229,18 @@ void CheckGameEnd(TILE board[ROWS][COLS], char *data, TILE color, char myTurn)
     exit(EXIT_SUCCESS);
 }
 
+/******************************************************************************
+ * function name: WaitForOtherPlayer
+ * The Input: A pointer to the shared memory, the board and the player's color.
+ * The output: Makes the move gotten and finishes the game if it was it's end.
+ * The Function operation: Waits for the first char pointed by data to be
+ *      either the other's color's char or '*'.
+ *      If found the other's char it makes the move the other wrote to the
+ *      shared memory, prints the board after the move and checks if the game
+ *      is over (if it does, finishes it).
+ *      If found the end game char ('*') it means the other player doesn't
+ *      have a move to make so the game is over.
+*******************************************************************************/
 void WaitForOtherPlayer(char *data, TILE board[ROWS][COLS], TILE color)
 {
     do {
@@ -198,9 +275,19 @@ void WaitForOtherPlayer(char *data, TILE board[ROWS][COLS], TILE color)
 
     MakeAMove(board, OTHER_COLOR(color), y, x);
     PrintBoard(board);
-    CheckGameEnd(board, data, color, 0);
+    CheckGameEnd(board, data, 0);
 }
 
+/******************************************************************************
+ * function name: CheckForPossibleMoves
+ * The Input: The board, a pointer to the shared memory, and the player's color.
+ * The output: Check if there is a move to make. If not, ends the game and
+ *      writes who won to the shared memory.
+ * The Function operation: Goes over every empty tile, putting a piece there
+ *      and checking if this is a legal move, if so returns. If there aren't
+ *      moves to make the game is closed and the ending is writtrn to the
+ *      shared memory with the game finished char '*'.
+*******************************************************************************/
 void CheckForPossibleMoves(TILE board[ROWS][COLS], char *data, TILE color)
 {
     int i, j, bcounter = 0, wcounter = 0;
@@ -253,6 +340,15 @@ void CheckForPossibleMoves(TILE board[ROWS][COLS], char *data, TILE color)
     exit(EXIT_SUCCESS);
 }
 
+/******************************************************************************
+ * function name: main
+ * The Input: None.
+ * The output: Reversi game.
+ * The Function operation: Opens the fifo, writes it pid to it, and then wait
+ *      to get SIGUSR1 from the server. Then finds out which color it is, and
+ *      the makes a move and waits to other player to make a move, until the
+ *      end of the game.
+*******************************************************************************/
 int main()
 {
     int fifo, shmid;
@@ -401,7 +497,7 @@ int main()
         data[1] = (char) GET_CHAR_FROM_DIGIT(x); //column number
         data[0] = GetCharFromTileEnum(myColor); //color = b / w
 
-        CheckGameEnd(board, data, myColor, 1);
+        CheckGameEnd(board, data, 1);
 
         if (myColor == BLACK)
             WaitForOtherPlayer(data, board, myColor);
