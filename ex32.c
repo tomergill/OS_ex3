@@ -301,6 +301,7 @@ int main()
     board[3][3] = board[4][4] = BLACK;
     board[3][4] = board[4][3] = WHITE;
 
+
     /* wait for a SIGUSR1 signal */
     do
         pause();
